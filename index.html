@@ -111,7 +111,7 @@ body{background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSyst
 .stp{font-size:16px;font-weight:800;color:var(--ac);}
 .std{font-size:10px;color:var(--mu);text-align:right;margin-top:2px;}
 .stct{font-size:10px;background:rgba(123,94,167,.15);color:var(--ac2);padding:2px 9px;border-radius:10px;font-family:'Courier New',Courier,monospace;display:inline-block;margin-bottom:10px;}
-.ste{font-size:12px;color:#888;line-height:1.7;margin-bottom:12px;}
+.ste{font-size:12px;color:#888;line-height:1.8;margin-bottom:12px;white-space:pre-line;}
 .stcont{background:rgba(0,255,200,.04);border:1px solid rgba(0,255,200,.15);border-radius:10px;padding:12px;font-size:12px;color:#ccc;line-height:1.8;font-family:'Courier New',Courier,monospace;margin-bottom:10px;}
 .sub{width:100%;padding:11px;border-radius:10px;border:1px solid rgba(123,94,167,.4);background:rgba(123,94,167,.1);color:var(--ac2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
 .ulb{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ac);font-family:'Courier New',Courier,monospace;margin-bottom:8px;}
@@ -210,7 +210,7 @@ const PROMPTS=[
 ];
 
 const INIT_STRATS=[
-  {id:"s1",title:"The Relationship-First DM System",author:"@anonking1",authorTg:"@anonking1",cat:"System",teaser:"Step 1: Join their spaces consistently\nStep 2: Engage with their content\nStep 3: Reply with actual thoughts\nStep 4: DM naturally\n\nExample: \"Loved your point about community retention in today's space. Most projects underestimate onboarding.\"\n\nSimple. Human. Intelligent. Full scripts + unhinged version inside.",price:"$2",proof:"Limited time — was $7",code:"WARMCLOSE",content:"Most DMs get ignored because they're cold. This system warms the founder before you ever send a pitch.\n\nStep 1 — JOIN THEIR SPACES CONSISTENTLY\nFind their X Spaces or Twitter Lives. Join every one for 3-5 days. Don't speak. Just be there. Your name shows up in the listeners list. They notice the consistency.\n\nStep 2 — ENGAGE WITH THEIR CONTENT\nLike, retweet, and comment on their posts for 3-5 days. Don't say 'great post.' Say something real. Add a thought. Disagree slightly if you actually disagree. Real engagement stands out in a sea of bots.\n\nStep 3 — REPLY WITH ACTUAL THOUGHTS\nWhen they post something specific, reply with a genuine observation:\n\n'Loved your point about community retention in today's space. Most projects underestimate onboarding — they focus on acquisition and forget the holders they already have.'\n\nSimple. Human. Intelligent. This is the line that makes them click your profile.\n\nStep 4 — DM NATURALLY\nAfter 5-7 days of this, the DM doesn't feel cold anymore. Open like this:\n\n'Been following your build for a bit — your take on [specific thing] was sharp. Quick question: who's handling your [KOL/collab/community] strategy right now? Think there's an angle you're missing based on where you are in the roadmap.'\n\nThat's it. No pitch. Just a question. The conversation opens itself.\n\nUNHINGED VERSION (when you want to be bold):\n'Your spaces are actually good which is rare. The product is real. The marketing is the problem and it's fixable. DM me if you want to know what I'd do differently.'\n\nKEY RULE: Never pitch in the first DM. Ask one diagnostic question. Let them sell themselves on needing you."},
+  {id:"s1",title:"The Relationship-First DM System",author:"@anonking1",authorTg:"@anonking1",cat:"System",teaser:"Step 1: Join their spaces consistently\nStep 2: Engage with their content\nStep 3: Reply with actual thoughts\nStep 4: DM naturally\n\nExample: \"Loved your point about community retention in today's space. Most projects underestimate onboarding.\"\n\nSimple. Human. Intelligent.\n\n🔒 Full scripts, timing breakdown + unhinged version locked inside.",price:"$2",proof:"Limited time — was $7",code:"WARMCLOSE",content:"Most DMs get ignored because they're cold. This system warms the founder before you ever send a pitch.\n\nStep 1 — JOIN THEIR SPACES CONSISTENTLY\nFind their X Spaces or Twitter Lives. Join every one for 3-5 days. Don't speak. Just be there. Your name shows up in the listeners list. They notice the consistency.\n\nStep 2 — ENGAGE WITH THEIR CONTENT\nLike, retweet, and comment on their posts for 3-5 days. Don't say 'great post.' Say something real. Add a thought. Disagree slightly if you actually disagree. Real engagement stands out in a sea of bots.\n\nStep 3 — REPLY WITH ACTUAL THOUGHTS\nWhen they post something specific, reply with a genuine observation:\n\n'Loved your point about community retention in today's space. Most projects underestimate onboarding — they focus on acquisition and forget the holders they already have.'\n\nSimple. Human. Intelligent. This is the line that makes them click your profile.\n\nStep 4 — DM NATURALLY\nAfter 5-7 days of this, the DM doesn't feel cold anymore. Open like this:\n\n'Been following your build for a bit — your take on [specific thing] was sharp. Quick question: who's handling your [KOL/collab/community] strategy right now? Think there's an angle you're missing based on where you are in the roadmap.'\n\nThat's it. No pitch. Just a question. The conversation opens itself.\n\nUNHINGED VERSION (when you want to be bold):\n'Your spaces are actually good which is rare. The product is real. The marketing is the problem and it's fixable. DM me if you want to know what I'd do differently.'\n\nKEY RULE: Never pitch in the first DM. Ask one diagnostic question. Let them sell themselves on needing you."},
 ];
 
 const ls={g:(k)=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},s:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},};
@@ -240,13 +240,16 @@ function App(){
   const [sv,sSv]=useState("browse");
   const [sf,sSf]=useState(ES);
   const [sdone,setSdone]=useState(false);
+  const [refHandle,sRefHandle]=useState(()=>ls.g("oc-ref")||"");
+  const [refBy,sRefBy]=useState("");
 
   const toast_=m=>{sToast(m);setTimeout(()=>sToast(null),2400);};
   const savL=u=>{sL(u);ls.s("oc-l",u);};
   const addL=()=>{const n={...form,id:uid(),contacted:new Date().toISOString().slice(0,10)};savL([n,...leads]);sF(EL);sV("list");toast_("Lead added ✓");};
   const updL=(id,ch)=>{const u=leads.map(l=>l.id===id?{...l,...ch}:l);savL(u);if(sel?.id===id)sSel({...sel,...ch});};
   const delL=id=>{savL(leads.filter(l=>l.id!==id));sV("list");sSel(null);toast_("Removed");};
-  const unlock_=()=>{if(validProCode(ci)){sP(true);ls.s("oc-p",true);sCe("");toast_("Pro unlocked 🚀");}else{sCe(`Wrong code. DM ${TG} on Telegram to get yours.`);}};
+  const unlock_=()=>{if(validProCode(ci)){sP(true);ls.s("oc-p",true);if(refBy)ls.s("oc-refby",refBy);sCe("");toast_("Pro unlocked 🚀");}else{sCe(`Wrong code. DM ${TG} on Telegram to get yours.`);}};
+  const saveRef=(v)=>{sRefHandle(v);ls.s("oc-ref",v);};;
   const copy_=(text,id)=>{navigator.clipboard.writeText(text).catch(()=>{});sCp(id);setTimeout(()=>sCp(null),2000);toast_("Copied ✓");};
   const tryUl=()=>{const s=strats.find(x=>x.id===ulTgt?.id);if(s&&ulCode.trim()===s.code){const u=[...ulked,s.id];sUlked(u);ls.s("oc-ul",u);sUlTgt(null);sUlCode("");sUlErr("");toast_("Unlocked 🎉");}else{sUlErr("Wrong code. Pay the seller first.");}};
   const submitS=()=>{const msg=`NEW STRATEGY\nTitle: ${sf.title}\nCat: ${sf.cat}\nPrice: ${sf.price}\nProof: ${sf.proof}\nAuthor X: ${sf.authorHandle}\nAuthor TG: ${sf.authorTg}\nCode: ${sf.code}\n\nTeaser:\n${sf.teaser}\n\nContent:\n${sf.content}`;navigator.clipboard.writeText(msg).catch(()=>{});setSdone(true);toast_("Copied! Send to "+TG);};
@@ -383,23 +386,35 @@ function App(){
         e("div",{className:"st"},"Winning Strategies"),
         e("div",{className:"ss"},"Real systems from closers who've used them"),
         e("div",{style:{background:"rgba(123,94,167,.08)",border:"1px solid rgba(123,94,167,.2)",borderRadius:12,padding:14,marginBottom:16}},
-          e("div",{style:{fontSize:11,color:"#7B5EA7",fontWeight:700,fontFamily:"'Space Mono',monospace",marginBottom:4}},"HOW IT WORKS"),
+          e("div",{style:{fontSize:11,color:"#7B5EA7",fontWeight:700,fontFamily:"'Courier New',monospace",marginBottom:4}},"HOW IT WORKS"),
           e("div",{style:{fontSize:11,color:"#4a4a6a",lineHeight:1.9}},
-            "Pay seller directly on Telegram.",e("br",null),
-            "Send ",e("strong",{style:{color:"#f0c040"}},CUT,"% to ",TG),".",e("br",null),
-            "Seller gives you the unlock code."
+            "All payments go through ",e("strong",{style:{color:"#00ffc8"}},TG)," for full transparency.",e("br",null),
+            "Pay → receive unlock code → access instantly.",e("br",null),
+            e("span",{style:{color:"#f0c040"}},"Every transaction verified. No middleman risk.")
           )
         ),
         strats.length===0&&e("div",{className:"empty"},e("div",{style:{fontSize:28,marginBottom:8}},"📖"),e("div",{style:{fontSize:12,lineHeight:1.7}},"No strategies yet.\nBe the first to sell yours.")),
-        ...strats.map(s=>{const owned=ulked.includes(s.id);return e("div",{key:s.id,className:"stc"},
-          e("div",{className:"stm"},
-            e("div",null,e("div",{className:"stt"},s.title),e("div",{className:"sta"},s.author)),
-            e("div",{style:{textAlign:"right"}},e("div",{className:"stp"},s.price),e("div",{className:"std"},s.proof))
+        ...strats.map(s=>{const owned=ulked.includes(s.id);return e("div",{key:s.id,style:{marginBottom:16}},
+          !owned&&e("div",{style:{background:"linear-gradient(135deg,rgba(255,68,85,.08),rgba(123,94,167,.08))",border:"1px solid rgba(255,68,85,.25)",borderRadius:12,padding:"12px 14px",marginBottom:8}},
+            e("div",{style:{fontSize:13,color:"#fff",fontWeight:700,lineHeight:1.8}},"While you're crafting the perfect cold DM, someone with zero pitch experience just got a reply from a founder who hasn't responded to anyone in weeks."),
+            e("div",{style:{fontSize:12,color:"#f0c040",marginTop:6,fontWeight:600}},"The difference isn't talent. It's this system. $2.")
           ),
-          e("div",{className:"stct"},s.cat),
-          e("div",{className:"ste"},s.teaser),
-          owned?e(React.Fragment,null,e("div",{className:"ulb"},"✓ UNLOCKED"),e("div",{className:"stcont"},s.content)):
-          e("button",{className:"sub",onClick:()=>sUlTgt(s)},"🔒 Unlock for ",s.price)
+          e("div",{className:"stc"},
+            e("div",{className:"stm"},
+              e("div",null,e("div",{className:"stt"},s.title),e("div",{className:"sta"},s.author)),
+              e("div",{style:{textAlign:"right"}},
+                e("div",{style:{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end"}},
+                  e("span",{style:{fontSize:13,color:"#4a4a6a",textDecoration:"line-through"}},"$7"),
+                  e("span",{style:{fontSize:18,fontWeight:800,color:"#00ffc8"}},s.price)
+                ),
+                e("div",{style:{fontSize:10,color:"#f0c040",marginTop:2}},"⏰ Limited time")
+              )
+            ),
+            e("div",{className:"stct"},s.cat),
+            e("div",{className:"ste"},s.teaser),
+            owned?e(React.Fragment,null,e("div",{className:"ulb"},"✓ UNLOCKED"),e("div",{className:"stcont"},s.content)):
+            e("button",{className:"sub",onClick:()=>sUlTgt(s)},"🔒 Unlock for ",s.price," — before price goes back to $7")
+          )
         );})
       ),
       sv==="sell"&&e("div",{className:"sec"},
@@ -425,10 +440,49 @@ function App(){
 
     // ════ PRO ════
     tab==="pro"&&e("div",{className:"page"},
-      isPro?e("div",{className:"ls"},e("div",{className:"li"},"💎"),e("div",{className:"lt",style:{color:"#00ffc8"}},"Pro Active"),e("div",{className:"lb"},"Full access. Go close deals.")):
+      isPro?e("div",{className:"sec"},
+        e("div",{style:{textAlign:"center",padding:"20px 0 16px"}},
+          e("div",{className:"li"},"💎"),
+          e("div",{className:"lt",style:{color:"#00ffc8"}},"Pro Active"),
+          e("div",{className:"lb"},"Full access. Go close deals.")
+        ),
+        // REFERRAL SECTION FOR PRO USERS
+        e("div",{style:{background:"rgba(0,255,200,.04)",border:"1px solid rgba(0,255,200,.2)",borderRadius:14,padding:16,marginBottom:12}},
+          e("div",{style:{fontSize:11,color:"#00ffc8",fontWeight:700,fontFamily:"'Courier New',monospace",letterSpacing:2,marginBottom:8}},"💸 YOUR REFERRAL LINK"),
+          e("div",{style:{fontSize:12,color:"#888",lineHeight:1.8,marginBottom:12}},
+            "Share OpenClose with your network.",e("br",null),
+            "Anyone who signs up through your handle earns you ",e("strong",{style:{color:"#00ffc8"}},"40% of their Pro payment"),", every month they stay.",e("br",null),
+            e("span",{style:{color:"#f0c040"}},"That's ~$2.40/month per person you refer.")
+          ),
+          e("div",{className:"f",style:{marginBottom:8}},
+            e("label",null,"Your Referral Handle"),
+            e("input",{placeholder:"e.g. @yourhandle",value:refHandle,onChange:ev=>saveRef(ev.target.value)})
+          ),
+          refHandle&&e("div",{style:{background:"#0c0c1e",border:"1px solid rgba(255,255,255,.07)",borderRadius:8,padding:"10px 12px",marginBottom:10}},
+            e("div",{style:{fontSize:10,color:"#4a4a6a",marginBottom:4,fontFamily:"'Courier New',monospace"}},"SHARE THIS LINK"),
+            e("div",{style:{fontSize:12,color:"#00ffc8",wordBreak:"break-all"}},"abdallerhnet-web.github.io/openclosed?ref=",refHandle.replace("@",""))
+          ),
+          refHandle&&e("button",{className:"cpb",onClick:()=>{navigator.clipboard.writeText(`abdallerhnet-web.github.io/openclosed?ref=${refHandle.replace("@","")}`).catch(()=>{});toast_("Referral link copied ✓");}},"Copy Link")
+        ),
+        // EARNINGS BREAKDOWN
+        e("div",{style:{background:"rgba(123,94,167,.06)",border:"1px solid rgba(123,94,167,.2)",borderRadius:14,padding:16}},
+          e("div",{style:{fontSize:11,color:"#7B5EA7",fontWeight:700,fontFamily:"'Courier New',monospace",letterSpacing:2,marginBottom:12}},"💰 EARN WITH OPENCLOSE"),
+          ...[
+            ["Refer a Pro user","$2.40/month","40% of their payment, every month"],
+            ["Refer a strategy buyer","20% of sale","When your referral buys a strategy"],
+            ["Sell your strategy","70% of price","You set the price, you keep most"],
+            ["Stay subscribed","Full access","All tools, all prompts, all strategies"],
+          ].map(([title,amount,desc])=>
+            e("div",{key:title,style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:12,borderBottom:"1px solid rgba(255,255,255,.05)"}},
+              e("div",null,e("div",{style:{fontSize:13,fontWeight:700,color:"#fff"}},title),e("div",{style:{fontSize:11,color:"#4a4a6a",marginTop:2}},desc)),
+              e("div",{style:{fontSize:13,fontWeight:700,color:"#00ffc8",whiteSpace:"nowrap",marginLeft:8}},amount)
+            )
+          )
+        )
+      ):
       e("div",{className:"sec"},
         e("div",{style:{textAlign:"center",padding:"20px 0 16px"}},
-          e("div",{style:{fontSize:10,color:"#00ffc8",letterSpacing:3,fontFamily:"'Space Mono',monospace",marginBottom:8}},"UPGRADE"),
+          e("div",{style:{fontSize:10,color:"#00ffc8",letterSpacing:3,fontFamily:"'Courier New',monospace",marginBottom:8}},"UPGRADE"),
           e("div",{style:{fontSize:22,fontWeight:800}},"OpenClose Pro"),
           e("div",{style:{fontSize:12,color:"#4a4a6a",marginTop:4}},"Every tool you need to close deals daily")
         ),
@@ -436,12 +490,13 @@ function App(){
           e("div",{className:`pc${plan==="m"?" on":""}`,onClick:()=>sPlan("m")},e("div",{className:"pl"},"MONTHLY"),e("div",{className:"pa"},"$5.99"),e("div",{className:"pp"},"/ month")),
           e("div",{className:`pc${plan==="y"?" on":""}`,onClick:()=>sPlan("y")},e("div",{className:"pl"},"YEARLY"),e("div",{className:"pa"},"$19.99"),e("div",{className:"pp"},"/ year"),e("div",{className:"ps"},"Save 72%"))
         ),
-        ...[["♾️","Unlimited Leads","Free tier caps at 5. Pro removes the limit."],["🔍","10 Lead Sources","Pump.fun, Dexscreener, Birdeye + 7 more with insider tips."],["💬","Full Prompt Library","Grok prompts, DM templates, follow-ups, objection handlers."],["📖","Strategist Access","Buy winning systems from closers. Sell your own and earn."],["📅","Follow-up Tracker","Never let a lead go cold."]].map(([ic,ti,de])=>
+        ...[["♾️","Unlimited Leads","Free tier caps at 5. Pro removes the limit."],["🔍","10 Lead Sources","Pump.fun, Dexscreener, Birdeye + 7 more with insider tips."],["💬","Full Prompt Library","Grok prompts, DM templates, follow-ups, objection handlers."],["📖","Strategist Access","Buy winning systems from closers. Sell your own and earn."],["💸","Refer & Earn","Refer friends and earn 40% of their payment every month."]].map(([ic,ti,de])=>
           e("div",{className:"fi",key:ti},e("div",{className:"fi-ic"},ic),e("div",null,e("div",{className:"fi-t"},ti),e("div",{className:"fi-d"},de)))
         ),
         e("div",{className:"ub"},
-          e("div",{className:"uh"},"DM ",e("strong",{style:{color:"#00ffc8"}},TG)," on Telegram.",e("br",null),"Pay ",e("strong",{style:{color:"#fff"}},plan==="m"?"$5.99":"$19.99"),". You'll receive your monthly access code instantly.",e("br",null),e("span",{style:{fontSize:10,color:"#4a4a6a"}},"Code refreshes monthly. Active subscribers get the new code automatically.")),
+          e("div",{className:"uh"},"DM ",e("strong",{style:{color:"#00ffc8"}},TG)," on Telegram.",e("br",null),"Pay ",e("strong",{style:{color:"#fff"}},plan==="m"?"$5.99":"$19.99"),". Receive your code instantly."),
           e("div",{className:"f",style:{marginBottom:8}},e("input",{placeholder:"Enter access code",value:ci,onChange:ev=>{sCi(ev.target.value);sCe("");}})),
+          e("div",{className:"f",style:{marginBottom:8}},e("input",{placeholder:"Referred by? (optional — enter their @handle)",value:refBy,onChange:ev=>sRefBy(ev.target.value)})),
           ce&&e("div",{className:"em"},ce),
           e("button",{className:"bp",onClick:unlock_},"Unlock Pro")
         )
