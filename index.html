@@ -132,11 +132,24 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5);}
 </head>
 <body>
 <div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
-const {useState}=React;
+const {useState,useEffect}=React;
 const ADMIN="ABDYWEB3",TG="@anonking1",FREE=5,CUT=25;
+
+// ── SUPABASE CONFIG ──
+// Fill these in after creating your project at supabase.com
+// (Project Settings → API → Project URL / anon public key)
+const SUPABASE_URL="";
+const SUPABASE_ANON_KEY="";
+const sb=(SUPABASE_URL&&SUPABASE_ANON_KEY)?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+// Fallback proxy in case DexScreener blocks direct browser CORS requests.
+// Replace with your deployed Cloudflare Worker URL once you have one, e.g.:
+// "https://openclose-proxy.yourname.workers.dev"
+// Leave as "" to skip the fallback and rely on direct calls only.
+const SCOUT_PROXY="";
 
 // Monthly rotating code generator — OC + MONTH + YR (e.g. OCMAY26)
 function validProCode(input){
@@ -153,6 +166,42 @@ function validProCode(input){
 }
 const STATUS={"No Reply":{c:"#888",b:"rgba(136,136,136,.1)"},"Replied":{c:"#f0c040",b:"rgba(240,192,64,.1)"},"In Convo":{c:"#40c0f0",b:"rgba(64,192,240,.1)"},"Closed 💰":{c:"#00ffc8",b:"rgba(0,255,200,.1)"},"Dead ❌":{c:"#ff4455",b:"rgba(255,68,85,.1)"}};
 const CHAINS=["Solana","Base","BSC","ETH","Other"],PLATS=["X","Telegram","Discord"];
+const SCOUT_CFG={
+  Solana:{q:"SOL",chainId:"solana"},
+  Base:{q:"WETH",chainId:"base"},
+  BSC:{q:"BNB",chainId:"bsc"},
+  ETH:{q:"WETH",chainId:"ethereum"},
+};
+function chainLabelFromId(id){
+  if(id==="solana")return"Solana";
+  if(id==="base")return"Base";
+  if(id==="bsc")return"BSC";
+  if(id==="ethereum")return"ETH";
+  return"Other";
+}
+
+const ROLES=[
+  {id:"founder",label:"Project Founder",icon:"🚀",tagline:"Launching a token or project",questions:[
+    {key:"projectType",label:"What are you launching?",options:["Meme Coin","Utility Project","NFT","Other"]},
+    {key:"chain",label:"Primary chain",options:["Solana","Base","BSC","ETH","Other"]},
+    {key:"budget",label:"Marketing budget range",options:["<$500","$500–2K","$2K–10K","$10K+"]},
+  ]},
+  {id:"marketing",label:"Marketing Manager",icon:"📢",tagline:"Running campaigns for a project",questions:[
+    {key:"chain",label:"Which chain(s) do you focus on?",options:["Solana","Base","BSC","ETH","Multi-chain"]},
+    {key:"kolVolume",label:"Typical KOL volume per campaign",options:["1–10","10–50","50–100","100+"]},
+    {key:"budget",label:"Monthly campaign budget",options:["<$1K","$1K–5K","$5K–20K","$20K+"]},
+  ]},
+  {id:"ambassador",label:"Ambassador",icon:"🌍",tagline:"Repping a project in your region",questions:[
+    {key:"region",label:"Region you cover",options:["Africa","Asia","MENA","Europe","LATAM","Global"]},
+    {key:"chain",label:"Projects/chains you represent",options:["Solana","Base","BSC","ETH","Multi-chain"]},
+    {key:"contentType",label:"Preferred content type",options:["Threads/Posts","Videos","Spaces/AMAs","Community Mgmt"]},
+  ]},
+  {id:"kol",label:"KOL",icon:"🎙️",tagline:"You post, you get paid",questions:[
+    {key:"platform",label:"Primary platform",options:["X","Telegram","Both"]},
+    {key:"followers",label:"Follower range",options:["<5K","5K–25K","25K–100K","100K+"]},
+    {key:"niche",label:"Niche",options:["Meme Coins","Utility/DeFi","NFT","General Crypto"]},
+  ]},
+];
 
 const SOURCES=[
   {name:"Pump.fun",url:"https://pump.fun",chain:"Solana",tag:"🔥 Hottest",tip:"New meme coins every minute. Filter 'Just launched'. 50–500 holders + active dev wallet buying = hot lead."},
@@ -217,8 +266,20 @@ const ls={g:(k)=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){retur
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const EL={id:null,project:"",handle:"",website:"",chain:"Solana",followers:"",platform:"X",status:"No Reply",contacted:"",followUp:"",notes:""};
 const ES={title:"",cat:"System",teaser:"",content:"",price:"",authorHandle:"",authorTg:"",proof:"",code:""};
+const RATE_INIT={id:null,source:"",platform:"Telegram",count:"",rate:"",markup:"25",notes:""};
 
 function App(){
+  const [profile,sProfile]=useState(()=>ls.g("oc-profile")||null);
+  const [onbStep,sOnbStep]=useState(0);
+  const [onbRole,sOnbRole]=useState(null);
+  const [onbName,sOnbName]=useState("");
+  const [onbAnswers,sOnbAnswers]=useState({});
+  const [session,sSession]=useState(null);
+  const [authChecked,sAuthChecked]=useState(!sb);
+  const [authEmail,sAuthEmail]=useState("");
+  const [authSent,sAuthSent]=useState(false);
+  const [authLoading,sAuthLoading]=useState(false);
+  const [authError,sAuthError]=useState("");
   const [tab,sT]=useState("pipeline");
   const [leads,sL]=useState(()=>ls.g("oc-l")||[]);
   const [isPro,sP]=useState(()=>ls.g("oc-p")===true);
@@ -242,6 +303,24 @@ function App(){
   const [sdone,setSdone]=useState(false);
   const [refHandle,sRefHandle]=useState(()=>ls.g("oc-ref")||"");
   const [refBy,sRefBy]=useState("");
+  const [rates,sRates]=useState(()=>ls.g("oc-rates")||[]);
+  const [isAdmin,sAdmin]=useState(()=>ls.g("oc-admin")===true);
+  const [rateView,sRateView]=useState("list");
+  const [rateSel,sRateSel]=useState(null);
+  const [rateForm,sRateForm]=useState(RATE_INIT);
+  const [radminCode,sRadminCode]=useState("");
+  const [radminErr,sRadminErr]=useState("");
+  const [leadsSub,sLeadsSub]=useState("directory");
+  const [scoutChain,sScoutChain]=useState(()=>{
+    const p=ls.g("oc-profile");
+    const c=p?.answers?.chain;
+    if(c&&SCOUT_CFG[c])return c;
+    return"Solana";
+  });
+  const [scoutResults,sScoutResults]=useState([]);
+  const [scoutLoading,sScoutLoading]=useState(false);
+  const [scoutError,sScoutError]=useState("");
+  const [scoutAdded,sScoutAdded]=useState([]);
 
   const toast_=m=>{sToast(m);setTimeout(()=>sToast(null),2400);};
   const savL=u=>{sL(u);ls.s("oc-l",u);};
@@ -253,11 +332,207 @@ function App(){
   const copy_=(text,id)=>{navigator.clipboard.writeText(text).catch(()=>{});sCp(id);setTimeout(()=>sCp(null),2000);toast_("Copied ✓");};
   const tryUl=()=>{const s=strats.find(x=>x.id===ulTgt?.id);if(s&&ulCode.trim()===s.code){const u=[...ulked,s.id];sUlked(u);ls.s("oc-ul",u);sUlTgt(null);sUlCode("");sUlErr("");toast_("Unlocked 🎉");}else{sUlErr("Wrong code. Pay the seller first.");}};
   const submitS=()=>{const msg=`NEW STRATEGY\nTitle: ${sf.title}\nCat: ${sf.cat}\nPrice: ${sf.price}\nProof: ${sf.proof}\nAuthor X: ${sf.authorHandle}\nAuthor TG: ${sf.authorTg}\nCode: ${sf.code}\n\nTeaser:\n${sf.teaser}\n\nContent:\n${sf.content}`;navigator.clipboard.writeText(msg).catch(()=>{});setSdone(true);toast_("Copied! Send to "+TG);};
+  const saveRates=u=>{sRates(u);ls.s("oc-rates",u);};
+  const addRate=()=>{const n={...rateForm,id:uid(),updatedAt:new Date().toISOString().slice(0,10)};saveRates([n,...rates]);sRateForm(RATE_INIT);sRateView("list");toast_("Source added ✓");};
+  const updRate=(id,ch)=>{const u=rates.map(r=>r.id===id?{...r,...ch}:r);saveRates(u);if(rateSel?.id===id)sRateSel({...rateSel,...ch});};
+  const delRate=id=>{saveRates(rates.filter(r=>r.id!==id));sRateSel(null);sRateView("list");toast_("Removed");};
+  const tryAdmin=()=>{if(radminCode.trim()===ADMIN){sAdmin(true);ls.s("oc-admin",true);sRadminErr("");toast_("Unlocked 🔐");}else{sRadminErr("Wrong code.");}};
+  const clientPrice=(rate,markup)=>{const r=parseFloat(rate)||0;const m=parseFloat(markup)||0;return r*(1+m/100);};
+
+  const finishOnboarding=async()=>{
+    const p={role:onbRole,name:onbName.trim()||"there",answers:onbAnswers,completedAt:new Date().toISOString()};
+    ls.s("oc-profile",p);
+    sProfile(p);
+    if(sb&&session){
+      try{await sb.from("profiles").upsert({id:session.user.id,name:p.name,role:p.role,answers:p.answers});}catch(e){}
+    }
+  };
+  const onbSetAnswer=(key,val)=>sOnbAnswers({...onbAnswers,[key]:val});
+
+  const loadProfileFromDb=async(userId)=>{
+    try{
+      const {data}=await sb.from("profiles").select("*").eq("id",userId).maybeSingle();
+      if(data&&data.role){
+        const p={role:data.role,name:data.name,answers:data.answers||{},completedAt:data.created_at};
+        sProfile(p);
+        ls.s("oc-profile",p);
+      }
+    }catch(e){}
+  };
+
+  useEffect(()=>{
+    if(!sb)return;
+    sb.auth.getSession().then(({data})=>{
+      sSession(data.session);
+      sAuthChecked(true);
+      if(data.session)loadProfileFromDb(data.session.user.id);
+    });
+    const {data:sub}=sb.auth.onAuthStateChange((_event,newSession)=>{
+      sSession(newSession);
+      if(newSession)loadProfileFromDb(newSession.user.id);
+    });
+    return ()=>sub?.subscription?.unsubscribe();
+  },[]);
+
+  const sendMagicLink=async()=>{
+    if(!sb||!authEmail.trim())return;
+    sAuthLoading(true);sAuthError("");
+    try{
+      const {error}=await sb.auth.signInWithOtp({email:authEmail.trim()});
+      if(error){sAuthError(error.message);}else{sAuthSent(true);}
+    }catch(e){
+      sAuthError("Couldn't send the link — check your connection and try again.");
+    }
+    sAuthLoading(false);
+  };
+
+  const runScout=async(chainLabel)=>{
+    sScoutLoading(true);sScoutError("");
+    const cfg=SCOUT_CFG[chainLabel]||SCOUT_CFG.Solana;
+    const path=`/latest/dex/search?q=${encodeURIComponent(cfg.q)}`;
+    const attempt=async(base)=>{
+      const res=await fetch(base+path);
+      if(!res.ok)throw new Error("bad response");
+      return res.json();
+    };
+    let data=null;
+    try{
+      data=await attempt("https://api.dexscreener.com");
+    }catch(directErr){
+      if(SCOUT_PROXY){
+        try{
+          data=await attempt(SCOUT_PROXY);
+        }catch(proxyErr){
+          sScoutError("Couldn't reach Dexscreener directly or via the backup proxy — tap Refresh to retry.");
+          sScoutResults([]);
+          sScoutLoading(false);
+          return;
+        }
+      }else{
+        sScoutError("Couldn't reach Dexscreener right now — tap Refresh to retry.");
+        sScoutResults([]);
+        sScoutLoading(false);
+        return;
+      }
+    }
+    try{
+      const now=Date.now();
+      const filtered=(data.pairs||[])
+        .filter(p=>p.chainId===cfg.chainId)
+        .filter(p=>p.pairCreatedAt&&(now-p.pairCreatedAt)<1000*60*60*48)
+        .filter(p=>{const liq=p.liquidity?.usd||0;return liq>=3000&&liq<=150000;})
+        .sort((a,b)=>b.pairCreatedAt-a.pairCreatedAt)
+        .slice(0,15);
+      sScoutResults(filtered);
+    }catch(e){
+      sScoutError("Got a response but couldn't read it — tap Refresh to retry.");
+      sScoutResults([]);
+    }
+    sScoutLoading(false);
+  };
+
+  useEffect(()=>{
+    if(isPro&&tab==="leads"&&leadsSub==="scout"){runScout(scoutChain);}
+    // eslint-disable-next-line
+  },[tab,leadsSub,scoutChain,isPro]);
+
+  const addFromScout=(p)=>{
+    const socials=p.info?.socials||[];
+    const tw=socials.find(s=>s.type==="twitter");
+    const handle=tw?tw.url.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//,"").replace(/\/$/,""):"";
+    const website=p.info?.websites?.[0]?.url||p.url||"";
+    const ageHrs=p.pairCreatedAt?Math.round((Date.now()-p.pairCreatedAt)/3600000):null;
+    const n={...EL,id:uid(),project:p.baseToken?.name||p.baseToken?.symbol||"Unnamed",handle,website,chain:chainLabelFromId(p.chainId),followers:"",platform:"X",status:"No Reply",contacted:new Date().toISOString().slice(0,10),notes:`Auto-sourced via Scout — liquidity $${Math.round(p.liquidity?.usd||0).toLocaleString()}, age ${ageHrs??"?"}h`};
+    savL([n,...leads]);
+    sScoutAdded([...scoutAdded,p.pairAddress]);
+    toast_("Added to Pipeline ✓");
+  };
 
   const atLim=!isPro&&leads.length>=FREE;
   const filtd=filt==="All"?leads:leads.filter(l=>l.status===filt);
   const stats={t:leads.length,h:leads.filter(l=>["Replied","In Convo"].includes(l.status)).length,c:leads.filter(l=>l.status==="Closed 💰").length};
   const e=React.createElement;
+
+  // ════ AUTH GATE — only active once Supabase keys are filled in ════
+  if(sb&&!authChecked){
+    return e("div",{style:{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"#05050f",display:"flex",alignItems:"center",justifyContent:"center",color:"#4a4a6a",fontFamily:"-apple-system,sans-serif",fontSize:13}},"Loading…");
+  }
+  if(sb&&!session){
+    return e("div",{style:{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"#05050f",color:"#e8e8f0",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"24px 20px 40px",display:"flex",flexDirection:"column",justifyContent:"center"}},
+      e("div",{style:{textAlign:"center",marginBottom:28}},
+        e("div",{style:{fontSize:22,fontWeight:800}},"Open",e("span",{style:{color:"#00ffc8"}},"Close")),
+        e("div",{style:{fontSize:12,color:"#4a4a6a",marginTop:6}},"Sign in with your email — no password needed.")
+      ),
+      authSent?e("div",{style:{textAlign:"center",padding:"30px 10px"}},
+        e("div",{style:{fontSize:36,marginBottom:12}},"📩"),
+        e("div",{style:{fontSize:15,fontWeight:700,marginBottom:6}},"Check your email"),
+        e("div",{style:{fontSize:12,color:"#4a4a6a",lineHeight:1.7}},"We sent a sign-in link to ",e("strong",{style:{color:"#00ffc8"}},authEmail),". Tap it on this phone to continue.")
+      ):e(React.Fragment,null,
+        e("input",{type:"email",placeholder:"you@email.com",value:authEmail,onChange:ev=>{sAuthEmail(ev.target.value);sAuthError("");},style:{width:"100%",background:"#13132a",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"13px 14px",color:"#e8e8f0",fontSize:15,marginBottom:10}}),
+        authError&&e("div",{style:{color:"#ff4455",fontSize:11,marginBottom:10}},authError),
+        e("button",{disabled:!authEmail.trim()||authLoading,onClick:sendMagicLink,style:{width:"100%",padding:14,borderRadius:12,border:"none",background:authEmail.trim()?"linear-gradient(135deg,#00ffc8,#7B5EA7)":"rgba(255,255,255,.05)",color:authEmail.trim()?"#000":"#4a4a6a",fontWeight:800,fontSize:14}},authLoading?"Sending...":"Send Sign-In Link")
+      )
+    );
+  }
+
+  // ════ ONBOARDING GATE — shown until signup is complete ════
+  if(!profile){
+    const roleObj=ROLES.find(r=>r.id===onbRole);
+    const totalSteps=roleObj?roleObj.questions.length+2:1; // role pick + questions + name/confirm
+    return e("div",{style:{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"#05050f",color:"#e8e8f0",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",padding:"24px 20px 40px"}},
+
+      // STEP 0 — pick a role
+      onbStep===0&&e(React.Fragment,null,
+        e("div",{style:{textAlign:"center",padding:"20px 0 8px"}},
+          e("div",{style:{fontSize:22,fontWeight:800}},"Open",e("span",{style:{color:"#00ffc8"}},"Close")),
+          e("div",{style:{fontSize:12,color:"#4a4a6a",marginTop:6}},"A few quick questions so we fetch leads that actually fit you.")
+        ),
+        e("div",{style:{marginTop:24}},
+          ...ROLES.map(r=>e("div",{key:r.id,onClick:()=>{sOnbRole(r.id);sOnbStep(1);},style:{background:"#0c0c1e",border:"1px solid rgba(255,255,255,.07)",borderRadius:14,padding:16,marginBottom:12,cursor:"pointer"}},
+            e("div",{style:{display:"flex",alignItems:"center",gap:12}},
+              e("div",{style:{fontSize:26}},r.icon),
+              e("div",null,
+                e("div",{style:{fontWeight:700,fontSize:15}},r.label),
+                e("div",{style:{fontSize:11,color:"#4a4a6a",marginTop:2}},r.tagline)
+              )
+            )
+          ))
+        )
+      ),
+
+      // STEPS 1..N — role-specific questions, one per screen
+      onbStep>=1&&onbStep<=(roleObj?roleObj.questions.length:0)&&roleObj&&(()=>{
+        const q=roleObj.questions[onbStep-1];
+        const answered=onbAnswers[q.key];
+        return e(React.Fragment,null,
+          e("div",{style:{fontSize:11,color:"#4a4a6a",fontFamily:"'Courier New',monospace",marginBottom:6}},"STEP ",onbStep," OF ",roleObj.questions.length),
+          e("div",{style:{fontSize:19,fontWeight:800,marginBottom:20}},q.label),
+          e("div",{style:{display:"flex",flexDirection:"column",gap:10}},
+            ...q.options.map(opt=>e("button",{key:opt,onClick:()=>onbSetAnswer(q.key,opt),style:{textAlign:"left",padding:"14px 16px",borderRadius:12,border:answered===opt?"1px solid #00ffc8":"1px solid rgba(255,255,255,.07)",background:answered===opt?"rgba(0,255,200,.08)":"#0c0c1e",color:answered===opt?"#00ffc8":"#e8e8f0",fontSize:14,fontWeight:answered===opt?700:400}},opt))
+          ),
+          e("div",{style:{display:"flex",gap:10,marginTop:28}},
+            e("button",{onClick:()=>sOnbStep(onbStep-1),style:{flex:1,padding:13,borderRadius:10,border:"1px solid rgba(255,255,255,.07)",background:"transparent",color:"#4a4a6a",fontSize:13}},"Back"),
+            e("button",{disabled:!answered,onClick:()=>sOnbStep(onbStep+1),style:{flex:2,padding:13,borderRadius:10,border:"none",background:answered?"linear-gradient(135deg,#00ffc8,#7B5EA7)":"rgba(255,255,255,.05)",color:answered?"#000":"#4a4a6a",fontWeight:800,fontSize:14}},"Continue")
+          )
+        );
+      })(),
+
+      // FINAL STEP — name + confirm
+      onbStep===(roleObj?roleObj.questions.length+1:1)&&roleObj&&e(React.Fragment,null,
+        e("div",{style:{fontSize:11,color:"#4a4a6a",fontFamily:"'Courier New',monospace",marginBottom:6}},"LAST STEP"),
+        e("div",{style:{fontSize:19,fontWeight:800,marginBottom:20}},"What should we call you?"),
+        e("input",{value:onbName,onChange:ev=>sOnbName(ev.target.value),placeholder:"Your name or handle",style:{width:"100%",background:"#13132a",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"13px 14px",color:"#e8e8f0",fontSize:15}}),
+        e("div",{style:{background:"#0c0c1e",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:14,marginTop:20}},
+          e("div",{style:{fontSize:11,color:"#00ffc8",fontWeight:700,marginBottom:8}},roleObj.icon," ",roleObj.label),
+          ...roleObj.questions.map(q=>e("div",{key:q.key,style:{fontSize:12,color:"#888",marginBottom:4}},q.label,": ",e("span",{style:{color:"#e8e8f0"}},onbAnswers[q.key]||"—")))
+        ),
+        e("div",{style:{display:"flex",gap:10,marginTop:28}},
+          e("button",{onClick:()=>sOnbStep(onbStep-1),style:{flex:1,padding:13,borderRadius:10,border:"1px solid rgba(255,255,255,.07)",background:"transparent",color:"#4a4a6a",fontSize:13}},"Back"),
+          e("button",{onClick:finishOnboarding,style:{flex:2,padding:13,borderRadius:10,border:"none",background:"linear-gradient(135deg,#00ffc8,#7B5EA7)",color:"#000",fontWeight:800,fontSize:14}},"Enter OpenClose")
+        )
+      )
+    );
+  }
 
   return e(React.Fragment,null,
     toast&&e("div",{className:"toast"},toast),
@@ -278,7 +553,7 @@ function App(){
 
     // HEADER
     e("div",{className:"hdr"},e("div",{className:"hdr-in"},
-      e("div",null,e("div",{className:"sdot"},isPro?"● PRO":"● FREE"),e("div",{className:"logo"},"Open",e("span",null,"Close"))),
+      e("div",null,e("div",{className:"sdot"},isPro?"● PRO":"● FREE"),e("div",{className:"logo"},"Open",e("span",null,"Close")),profile&&e("div",{style:{fontSize:10,color:"#4a4a6a",fontFamily:"'Courier New',monospace",marginTop:2}},profile.name," · ",ROLES.find(r=>r.id===profile.role)?.label)),
       e("div",{className:"stats"},
         ...[["LEADS",stats.t,"#aaa"],["HOT",stats.h,"#f0c040"],["CLOSED",stats.c,"#00ffc8"]].map(([l,v,c])=>e("div",{className:"stat",key:l},e("div",{className:"sv",style:{color:c}},v),e("div",{className:"sl"},l)))
       )
@@ -286,7 +561,7 @@ function App(){
 
     // TABS
     e("div",{className:"tabs"},
-      ...[["pipeline","📋 Pipeline"],["leads","🔍 Leads"],["prompts","💬 Prompts"],["strat","📖 Strategist"],["pro",isPro?"💎 Pro":"🔒 Pro"]].map(([id,label])=>
+      ...[["pipeline","📋 Pipeline"],["leads","🔍 Leads"],["prompts","💬 Prompts"],["strat","📖 Strategist"],["pro",isPro?"💎 Pro":"🔒 Pro"],["rates",isAdmin?"💰 Rates":"🔐 Rates"]].map(([id,label])=>
         e("button",{key:id,className:`tab${tab===id?" on":""}`,onClick:()=>{sT(id);if(id==="pipeline")sV("list");}},label)
       )
     ),
@@ -342,20 +617,60 @@ function App(){
 
     // ════ LEADS ════
     tab==="leads"&&e("div",{className:"page"},
-      !isPro?e("div",{className:"ls"},e("div",{className:"li"},"🔍"),e("div",{className:"lt"},"Pro Feature"),e("div",{className:"lb"},"10 curated lead sources with insider tips on exactly what to look for."),e("button",{className:"bp",onClick:()=>sT("pro")},"Unlock Pro")):
-      e("div",{className:"sec"},
-        e("div",{className:"st"},"Lead Sources"),
-        e("div",{className:"ss"},"Read the tip before opening each source"),
-        ...SOURCES.map((src,i)=>e("div",{key:i,className:"sc"},
-          e("div",{className:"sc-h",onClick:()=>sEx(exSrc===i?null:i)},
-            e("div",null,
-              e("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:3}},e("span",{style:{fontWeight:700,fontSize:14}},src.name),e("span",{className:"sc-tag"},src.tag)),
-              e("div",{style:{fontSize:11,color:"#4a4a6a",fontFamily:"'Space Mono',monospace"}},src.chain)
+      !isPro?e("div",{className:"ls"},e("div",{className:"li"},"🔍"),e("div",{className:"lt"},"Pro Feature"),e("div",{className:"lb"},"10 curated lead sources plus live auto-sourced candidates, filtered and ready to add."),e("button",{className:"bp",onClick:()=>sT("pro")},"Unlock Pro")):
+      e(React.Fragment,null,
+        e("div",{className:"pills"},
+          ...[["directory","Directory"],["scout","⚡ Auto-Scout"]].map(([id,label])=>e("button",{key:id,className:`pill${leadsSub===id?" on":""}`,onClick:()=>sLeadsSub(id)},label))
+        ),
+        leadsSub==="directory"&&e("div",{className:"sec"},
+          e("div",{className:"st"},"Lead Sources"),
+          e("div",{className:"ss"},"Read the tip before opening each source"),
+          ...SOURCES.map((src,i)=>e("div",{key:i,className:"sc"},
+            e("div",{className:"sc-h",onClick:()=>sEx(exSrc===i?null:i)},
+              e("div",null,
+                e("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:3}},e("span",{style:{fontWeight:700,fontSize:14}},src.name),e("span",{className:"sc-tag"},src.tag)),
+                e("div",{style:{fontSize:11,color:"#4a4a6a",fontFamily:"'Space Mono',monospace"}},src.chain)
+              ),
+              e("span",{style:{color:"#4a4a6a",fontSize:12}},exSrc===i?"▲":"▼")
             ),
-            e("span",{style:{color:"#4a4a6a",fontSize:12}},exSrc===i?"▲":"▼")
+            exSrc===i&&e("div",{className:"sc-b"},e("div",{style:{fontSize:12,color:"#888",lineHeight:1.8,marginTop:12,marginBottom:4}},src.tip),e("a",{href:src.url,target:"_blank",rel:"noreferrer",className:"ol"},"Open ",src.name," →"))
+          ))
+        ),
+        leadsSub==="scout"&&e("div",{className:"sec"},
+          e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}},
+            e("div",{className:"st"},"Auto-Scout"),
+            e("button",{className:"cpb",onClick:()=>runScout(scoutChain)},scoutLoading?"Loading...":"🔄 Refresh")
           ),
-          exSrc===i&&e("div",{className:"sc-b"},e("div",{style:{fontSize:12,color:"#888",lineHeight:1.8,marginTop:12,marginBottom:4}},src.tip),e("a",{href:src.url,target:"_blank",rel:"noreferrer",className:"ol"},"Open ",src.name," →"))
-        ))
+          e("div",{className:"ss"},"Live pairs pulled from Dexscreener — under 48h old, $3K–$150K liquidity"),
+          e("div",{className:"chips",style:{marginBottom:14}},
+            ...Object.keys(SCOUT_CFG).map(c=>e("button",{key:c,className:`chip${scoutChain===c?" on":""}`,onClick:()=>sScoutChain(c)},c))
+          ),
+          scoutLoading&&e("div",{className:"empty"},e("div",{style:{fontSize:28,marginBottom:8}},"⏳"),e("div",{style:{fontSize:12}},"Scouting live pairs...")),
+          scoutError&&!scoutLoading&&e("div",{className:"empty"},e("div",{style:{fontSize:28,marginBottom:8}},"⚠️"),e("div",{style:{fontSize:12,lineHeight:1.7}},scoutError)),
+          !scoutLoading&&!scoutError&&scoutResults.length===0&&e("div",{className:"empty"},e("div",{style:{fontSize:28,marginBottom:8}},"🔭"),e("div",{style:{fontSize:12,lineHeight:1.7}},"No fresh pairs matched right now.\nTry another chain or refresh in a bit.")),
+          !scoutLoading&&scoutResults.map(p=>{
+            const added=scoutAdded.includes(p.pairAddress);
+            const ageHrs=p.pairCreatedAt?Math.round((Date.now()-p.pairCreatedAt)/3600000):null;
+            const liq=Math.round(p.liquidity?.usd||0);
+            return e("div",{key:p.pairAddress,className:"card"},
+              e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}},
+                e("div",null,
+                  e("div",{style:{fontWeight:700,fontSize:15}},p.baseToken?.name||p.baseToken?.symbol||"Unnamed"),
+                  e("div",{style:{fontSize:11,color:"#4a4a6a"}},p.baseToken?.symbol," · ",chainLabelFromId(p.chainId))
+                ),
+                e("div",{className:"bdg",style:{color:"#00ffc8",background:"rgba(0,255,200,.1)",border:"1px solid rgba(0,255,200,.25)"}},ageHrs!=null?ageHrs+"h old":"—")
+              ),
+              e("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}},
+                e("span",{className:"tag"},"liq $"+liq.toLocaleString()),
+                p.priceUsd&&e("span",{className:"tag"},"$"+parseFloat(p.priceUsd).toPrecision(3))
+              ),
+              e("div",{style:{display:"flex",gap:8}},
+                e("a",{href:p.url,target:"_blank",rel:"noreferrer",style:{flex:1}},e("button",{style:{width:"100%",padding:10,borderRadius:9,border:"1px solid var(--bd)",background:"transparent",color:"var(--mu)",fontSize:12}},"View Chart")),
+                e("button",{style:{flex:1,padding:10,borderRadius:9,border:"none",background:added?"rgba(0,255,200,.15)":"linear-gradient(135deg,var(--ac),var(--ac2))",color:added?"var(--ac)":"#000",fontWeight:700,fontSize:12},disabled:added,onClick:()=>addFromScout(p)},added?"✓ Added":"+ Add to Pipeline")
+              )
+            );
+          })
+        )
       )
     ),
 
@@ -499,6 +814,76 @@ function App(){
           e("div",{className:"f",style:{marginBottom:8}},e("input",{placeholder:"Referred by? (optional — enter their @handle)",value:refBy,onChange:ev=>sRefBy(ev.target.value)})),
           ce&&e("div",{className:"em"},ce),
           e("button",{className:"bp",onClick:unlock_},"Unlock Pro")
+        )
+      )
+    ),
+
+    // ════ RATES (Internal — Admin Only, separate from Pro) ════
+    tab==="rates"&&e("div",{className:"page"},
+      !isAdmin?e("div",{className:"sec"},
+        e("div",{className:"ls"},
+          e("div",{className:"li"},"🔐"),
+          e("div",{className:"lt"},"Internal Access Only"),
+          e("div",{className:"lb"},"Source rates and margin tracking. Not part of the Pro tier — admin code required.")
+        ),
+        e("div",{className:"f"},e("input",{type:"password",placeholder:"Enter admin code",value:radminCode,onChange:ev=>{sRadminCode(ev.target.value);sRadminErr("");}})),
+        radminErr&&e("div",{className:"em"},radminErr),
+        e("button",{className:"bp",onClick:tryAdmin},"Unlock")
+      ):
+      e(React.Fragment,null,
+        rateView==="list"&&e("div",{className:"sec"},
+          e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}},
+            e("div",{className:"st"},"Source Rates"),
+            e("button",{className:"cpb",onClick:()=>{sRateForm(RATE_INIT);sRateView("add");}},"+ Add Source")
+          ),
+          e("div",{className:"ss"},"Their rate → your markup → client price"),
+          rates.length>0&&e("div",{style:{display:"flex",gap:10,marginBottom:14}},
+            ...[["Sources",rates.length,"#aaa"],["Avg Markup",(rates.reduce((s,r)=>s+(parseFloat(r.markup)||0),0)/rates.length).toFixed(0)+"%","#f0c040"],["Margin","$"+rates.reduce((s,r)=>s+(clientPrice(r.rate,r.markup)-(parseFloat(r.rate)||0)),0).toLocaleString(undefined,{maximumFractionDigits:0}),"#00ffc8"]].map(([l,v,c])=>
+              e("div",{key:l,style:{flex:1,background:"var(--sf)",border:"1px solid var(--bd)",borderRadius:12,padding:"10px 6px",textAlign:"center"}},
+                e("div",{style:{fontSize:14,fontWeight:800,color:c}},v),
+                e("div",{style:{fontSize:9,color:"#4a4a6a",fontFamily:"'Courier New',monospace"}},l)
+              )
+            )
+          ),
+          rates.length===0&&e("div",{className:"empty"},e("div",{style:{fontSize:36,marginBottom:10}},"💰"),e("div",{style:{fontSize:13,lineHeight:1.7}},"No sources tracked yet.\nTap + Add Source to start.")),
+          ...rates.map(r=>{const price=clientPrice(r.rate,r.markup);const margin=price-(parseFloat(r.rate)||0);return e("div",{key:r.id,className:"card",onClick:()=>{sRateSel(r);sRateView("detail");}},
+            e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}},
+              e("div",null,e("div",{style:{fontWeight:700,fontSize:15}},r.source),e("div",{style:{fontSize:11,color:"#4a4a6a"}},r.platform," · ",r.count||"-"," KOLs")),
+              e("div",{className:"bdg",style:{color:"#00ffc8",background:"rgba(0,255,200,.1)",border:"1px solid rgba(0,255,200,.25)"}},"$"+price.toLocaleString(undefined,{maximumFractionDigits:0}))
+            ),
+            e("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+              e("span",{className:"tag"},"rate $"+parseFloat(r.rate||0).toLocaleString()),
+              e("span",{className:"tag"},"+"+r.markup+"% markup"),
+              e("span",{className:"tag",style:{color:"#f0c040"}},"margin $"+margin.toLocaleString(undefined,{maximumFractionDigits:0}))
+            )
+          );})
+        ),
+        rateView==="add"&&e("div",{className:"sec"},
+          e("div",{style:{fontSize:16,fontWeight:800,color:"#00ffc8",marginBottom:16}},"+  New Source Quote"),
+          ...[["Source Name","source","text","e.g. Michael / Sunrise VC"],["# of KOLs","count","number","e.g. 100"],["Their Rate ($)","rate","number","e.g. 3550"],["Your Markup (%)","markup","number","e.g. 25"]].map(([label,key,type,ph])=>e("div",{className:"f",key},e("label",null,label),e("input",{type,placeholder:ph,value:rateForm[key],onChange:ev=>sRateForm({...rateForm,[key]:ev.target.value})}))),
+          e("div",{className:"f"},e("label",null,"Platform"),e("div",{className:"chips"},...["Telegram","Twitter","Both"].map(p=>e("button",{key:p,className:`chip${rateForm.platform===p?" on":""}`,onClick:()=>sRateForm({...rateForm,platform:p})},p)))),
+          e("div",{className:"f"},e("label",null,"Notes"),e("textarea",{placeholder:"Delivery time, region coverage, terms...",value:rateForm.notes,onChange:ev=>sRateForm({...rateForm,notes:ev.target.value}),rows:3})),
+          e("div",{style:{background:"var(--sf2)",border:"1px solid var(--bd)",borderRadius:10,padding:12,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+            e("span",{style:{fontSize:11,color:"#4a4a6a"}},"Client Price"),
+            e("span",{style:{fontSize:18,fontWeight:800,color:"#00ffc8"}},"$"+clientPrice(rateForm.rate,rateForm.markup).toLocaleString(undefined,{maximumFractionDigits:0}))
+          ),
+          e("button",{className:"bp",disabled:!rateForm.source,onClick:addRate},"Save Source")
+        ),
+        rateView==="detail"&&rateSel&&e(React.Fragment,null,
+          e("div",{style:{padding:16,borderBottom:"1px solid var(--bd)"}},
+            e("div",{style:{fontSize:19,fontWeight:800}},rateSel.source),
+            e("div",{style:{fontSize:12,color:"#4a4a6a",marginTop:2}},rateSel.platform," · ",rateSel.count||"-"," KOLs")
+          ),
+          e("div",{className:"sec"},
+            e("div",{className:"f"},e("label",null,"Their Rate ($)"),e("input",{type:"number",value:rateSel.rate,onChange:ev=>updRate(rateSel.id,{rate:ev.target.value})})),
+            e("div",{className:"f"},e("label",null,"Your Markup (%)"),e("input",{type:"number",value:rateSel.markup,onChange:ev=>updRate(rateSel.id,{markup:ev.target.value})})),
+            e("div",{style:{background:"var(--sf2)",border:"1px solid var(--bd)",borderRadius:10,padding:12,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+              e("span",{style:{fontSize:11,color:"#4a4a6a"}},"Client Price"),
+              e("span",{style:{fontSize:18,fontWeight:800,color:"#00ffc8"}},"$"+clientPrice(rateSel.rate,rateSel.markup).toLocaleString(undefined,{maximumFractionDigits:0}))
+            ),
+            e("div",{className:"f"},e("label",null,"Notes"),e("textarea",{rows:4,value:rateSel.notes||"",onChange:ev=>updRate(rateSel.id,{notes:ev.target.value})})),
+            e("button",{className:"bd-",onClick:()=>delRate(rateSel.id)},"Remove Source")
+          )
         )
       )
     ),
